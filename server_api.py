@@ -52,9 +52,9 @@ class server_job_handler:
     def handle_cr(self, job_id , job_params):
         job=self.jobs[job_id]
         result = self.__cr_function_list[job.job_stage](job_params)
-        job.job_stage+=1
-        job.job_timeout=timestamp()+self.__timeout
-        self.jobs[job_id]=job
+        job["job_stage"]+=1
+        job["job_timeout"]=timestamp()+self.__timeout
+        self.jobs["job_id"]=job
         return result
 
     def increase_timeout(self, job_id):
