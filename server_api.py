@@ -18,7 +18,7 @@ class server_job_handler:
     
 
     @staticmethod
-    async def job_deletion_manager():
+    async def job_deletion_manager():#deletes stale jobs
         while True:
             for handler in server_job_handler.job_type_list:
                 job_list = handler.jobs
@@ -41,7 +41,7 @@ class server_job_handler:
         server_job_handler.job_type_list.append(self)
 
     
-    def handle_ir(self, job_id , job_params): 
+    def handle_ir(self, job_id , job_params):#handles an incoming IR request
         result = self.__ir_function(job_params)
         job_stage=1 #IR received
         job_timeout=timestamp()+self.__timeout
@@ -49,7 +49,7 @@ class server_job_handler:
 "job_timeout":job_timeout}
         return result
 
-    def handle_cr(self, job_id , job_params):
+    def handle_cr(self, job_id , job_params): #handles an incoming CR request
         job=self.jobs[job_id]
         result = self.__cr_function_list[job["job_stage"]-1](job_params)
         job["job_stage"]+=1
@@ -58,11 +58,11 @@ class server_job_handler:
         self.jobs["job_id"]=job
         return result
 
-    def increase_timeout(self, job_id):
+    def increase_timeout(self, job_id): #increases the timeout
         self.jobs[job_id]["job_timeout"]=timestamp()+self.__timeout
         return
 
-class function_package:
+class function_package: #group of functions that the API needs: REST path, IR function, array of CR functions and timeout for gap between consecutive client continue requests
     def __init__(self, path ,ir_function,cr_function_list,timeout):
         self.ir_function = ir_function
         self.cr_function_list = cr_function_list
@@ -71,14 +71,14 @@ class function_package:
  
 
 class resource_init(resource.Resource):
-    def __init__(self, function_package):
+    def __init__(self, function_package):#initialise directory resource
         self.__function_package=function_package
         self.__server_job_handler=server_job_handler(function_package.ir_function, function_package.cr_function_list, function_package.timeout )
         super(resource_init, self).__init__()
 
 
 
-    async def render_get(self, request):
+    async def render_get(self, request): #render a reply packet
         int_unpack=unpack("ii",request.payload[0:8])
         count=int_unpack[0]
         job_id_client=int_unpack[1]
@@ -107,9 +107,9 @@ class resource_init(resource.Resource):
         return aiocoap.Message(payload=request.payload[0:8]+return_payload)
 
 
-class coap_server:    
+class coap_server: #coap server setup by the client
 
-    def __init__(self, ipv6_addr, port):
+    def __init__(self, ipv6_addr, port): #client initialises ip and port
         self.root = resource.Site()
         asyncio.Task(aiocoap.Context.create_server_context(self.root,bind=(ipv6_addr,port)))
         loop = asyncio.get_event_loop()
@@ -117,12 +117,11 @@ class coap_server:
             loop.create_task(server_job_handler.job_deletion_manager())
             server_job_handler.started=True
 
-    def add_listener(self,function_package):        
+    def add_listener(self,function_package): #add a job feature to the server
         resource_new=resource_init(function_package)
-        self.root.add_resource(("jobs",function_package.path), resource_new)
+        self.root.add_resource(function_package.path, resource_new)
 
-    def run_server(self):
-        
+    def run_server(self): #start the infinite loop        
         asyncio.get_event_loop().run_forever()
         
 
