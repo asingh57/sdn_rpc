@@ -1,10 +1,10 @@
+
 import logging
 import asyncio
-from struct import *
-from aiocoap import *
 
-logging.basicConfig(level=logging.INFO)
+from client_api import *
 
+'''
 async def main():
     protocol = await Context.create_client_context()
 
@@ -17,6 +17,19 @@ async def main():
         print(e)
     else:
         print('Result: %s\n%r'%(response.code, response.payload))
+
+if __name__ == "__main__":
+    asyncio.get_event_loop().run_until_complete(main())
+'''
+
+async def main():
+    #protocol = await Context.create_client_context()
+    protocol = await Context.create_client_context()
+    serv_job=server_job_type(protocol,3,"coap://192.168.1.100:5000/jobs/testing")
+
+    jb=job(serv_job)
+    
+    print(await jb.do_job_whole("fff".encode("ascii")))
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(main())

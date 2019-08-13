@@ -36,7 +36,7 @@ class server_job_handler:
         self.__ir_function = ir_function
         self.__cr_function_list = cr_function_list
         self.__timeout = timeout
-        self.__num_stages =  len(cr_function_list)-1
+        self.num_stages =  len(cr_function_list)
         self.jobs= {}
         server_job_handler.job_type_list.append(self)
 
@@ -51,8 +51,9 @@ class server_job_handler:
 
     def handle_cr(self, job_id , job_params):
         job=self.jobs[job_id]
-        result = self.__cr_function_list[job.job_stage](job_params)
+        result = self.__cr_function_list[job["job_stage"]-1](job_params)
         job["job_stage"]+=1
+        job["curr_result"]=result
         job["job_timeout"]=timestamp()+self.__timeout
         self.jobs["job_id"]=job
         return result
@@ -88,18 +89,19 @@ class resource_init(resource.Resource):
         return_payload=""
         server_job_id=(client_ip,job_id_client)
         with server_job_handler.lock:
-            
-            if count==0 and server_job_id not in self.__server_job_handler.jobs:
+            if count>self.__server_job_handler.num_stages:
+                return_payload= "Error, CR count exceeded".encode("ascii")           
+            elif count==0 and server_job_id not in self.__server_job_handler.jobs:
                return_payload= self.__server_job_handler.handle_ir(server_job_id,params)
             elif server_job_id not in self.__server_job_handler.jobs:
-               return_payload= "Error, no such job present on the server" 
+               return_payload= "Error, no such job present on the server".encode("ascii")
             elif count==self.__server_job_handler.jobs[server_job_id]["job_stage"]:
                return_payload= self.__server_job_handler.handle_cr((client_ip,job_id_client),params)
             elif count==self.__server_job_handler.jobs[server_job_id]["job_stage"]-1:
                self.__server_job_handler.increase_timeout(server_job_id)
                return_payload= self.__server_job_handler.jobs[server_job_id]["curr_result"]
             else:
-               return_payload= "Error, invalid IR or CR."
+               return_payload= "Error, invalid IR or CR.".encode("ascii")
                 
 
         return aiocoap.Message(payload=request.payload[0:8]+return_payload)
