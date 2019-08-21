@@ -4,9 +4,11 @@ from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
+from ryu.lib.packet import in_proto as inet
+from ryu.lib.packet import ether_types
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import udp
-from ryu.lib.packet import ipv6
+from ryu.lib.packet import ipv4
 import socket
 
 SERVER_UDP_PORT = 5000
@@ -14,6 +16,7 @@ CLIENT_UDP_PORT = 5000
 
 class myswitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
 
     def __init__(self, *args, **kwargs):
         super(myswitch, self).__init__(*args, **kwargs)
@@ -63,6 +66,7 @@ class myswitch(app_manager.RyuApp):
         dst = eth_pkt.dst
         src = eth_pkt.src
 
+
         in_port = msg.match['in_port']
 
         # self.logger.info("regular packet in %s %s %s %s", dpid, src, dst, in_port)
@@ -74,15 +78,16 @@ class myswitch(app_manager.RyuApp):
         else:
             out_port = ofproto.OFPP_FLOOD
 
-        if dst in self.server_list:
-            actions = [parser.OFPActionOutput(out_port),parser.OFPActionOutput(ofproto.OFPP_CONTROLLER) ]
-        else:
-            actions = [parser.OFPActionOutput(out_port)]
+        actions = [parser.OFPActionOutput(out_port)]
+        actions2 = [parser.OFPActionOutput(out_port),parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
 
 
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
+            match2 = parser.OFPMatch(in_port=in_port,eth_type=ether_types.ETH_TYPE_IP,
+            ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
             self.add_flow(datapath, 1, match, actions)
+            self.add_flow(datapath, 2, match2, actions2)
             self.flow[src] = dst
 
 
