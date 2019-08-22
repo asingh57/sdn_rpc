@@ -17,15 +17,12 @@ CLIENT_UDP_PORT = 5000
 class myswitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
-
     def __init__(self, *args, **kwargs):
         super(myswitch, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.flow = {}
         self.server_list = ['00:00:00:00:00:01']
         self.count = 0
-
-
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -81,13 +78,15 @@ class myswitch(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(out_port)]
         actions2 = [parser.OFPActionOutput(out_port),parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
 
-
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
             match2 = parser.OFPMatch(in_port=in_port,eth_type=ether_types.ETH_TYPE_IP,
             ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
+            match3 = parser.OFPMatch(in_port=in_port,eth_type=ether_types.ETH_TYPE_IP,
+            ip_proto=inet.IPPROTO_UDP,udp_src=5000)
             self.add_flow(datapath, 1, match, actions)
             self.add_flow(datapath, 2, match2, actions2)
+            self.add_flow(datapath, 2, match3, actions2)
             self.flow[src] = dst
 
 
@@ -110,12 +109,13 @@ class myswitch(app_manager.RyuApp):
 
             pkt = packet.Packet(msg.data)
             udp_header = pkt.get_protocols(udp.udp)
-            if udp_header!=[] and udp_header[0].dst_port==SERVER_UDP_PORT:
-                s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-                server = (socket.gethostname(),12345)
-                s.sendto(msg.data,server)
-                s.close()
-                self.logger.info('get coap data')
+            if udp_header!=[]:
+                if udp_header[0].src_port==SERVER_UDP_PORT or udp_header[0].dst_port==SERVER_UDP_PORT:
+                    s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+                    server = (socket.gethostname(),12345)
+                    s.sendto(msg.data,server)
+                    s.close()
+                    self.logger.info('get coap data')
             else:
                 self.flow.setdefault(src,'')
                 if dst!=self.flow[src]:
