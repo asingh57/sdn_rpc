@@ -25,10 +25,6 @@ s2.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
 s2.bind((address2,port2))
 
 s3 = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-address3 = socket.gethostname()
-port3 = 6004
-s3.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-s3.bind((address3,port3))
 
 class controller_server():
     def __init__(self):
@@ -53,13 +49,13 @@ class controller_server():
         for backup in self.server_list:
             if backup.is_health() and backup.mac != server.mac:
                 return backup
-            else:
-                return False
+        return False
 
 class controller_thread(threading.Thread):
     def __init__(self, controller):
         threading.Thread.__init__(self)
         self.controller = controller
+
     def  run(self):
         while True:
             data,addr = s.recvfrom(2048)
@@ -68,14 +64,14 @@ class controller_thread(threading.Thread):
             ipv4_header = pkt.get_protocol(ipv4.ipv4)
             udp_header = pkt.get_protocol(udp.udp)
             if udp_header.dst_port==SERVER_UDP_PORT:
-                server1 = controller.find_server(eth_header.dst)
+                server1 = self.controller.find_server(eth_header.dst)
                 if server1!=False and server1.is_health():
                     print("job_added to ", server1.mac)
-                    server1.add_job(pkt[-1], eth_header.src, ipv4_header.src)
+                    server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
             elif udp_header.src_port==SERVER_UDP_PORT:
-                server1 = controller.find_server(eth_header.src)
+                server1 = self.controller.find_server(eth_header.src)
                 if server1:
-                    server1.add_reply(pkt[-1])
+                    server1.add_reply(pkt[-1], eth_header.dst)
 
 
 
@@ -90,11 +86,11 @@ class heartbeat_thread(threading.Thread):
             eth_header = pkt.get_protocol(ethernet.ethernet)
             ipv4_header = pkt.get_protocol(ipv4.ipv4)
             udp_header = pkt.get_protocol(udp.udp)
-            if not controller.check_server_exist(eth_header.src):
+            if not self.controller.check_server_exist(eth_header.src):
                 server1 =  server.server(ipv4_header.src,eth_header.src)
-                controller.server_list.append(server1)
+                self.controller.server_list.append(server1)
             else:
-                server1 = controller.find_server(eth_header.src)
+                server1 = self.controller.find_server(eth_header.src)
             server1.set_stamp()
 
 class sendpacket_thread(threading.Thread):
@@ -104,18 +100,16 @@ class sendpacket_thread(threading.Thread):
 
     def run(self):
         while True:
-            for server1 in controller.server_list:
-                if not server1.is_health():
-                    server2 = controller.findback_server(server1)
-                    if server2!=False:
-                        data = [server1.mac,server1.ipv4,server2.mac,server2.ipv4]
-                        for j in server1.job_list:
-                            tmp = [j.mac, j.ipv4,j.pkt]
-                            data.append(tmp)
-                        out = json.dumps(data)
-                        s3.sendto(out, (socket.gethostname(),6004))
-            data = 'hi'
-            s3.sendto(data.encode(),(socket.gethostname(),6004))
+            for server1 in self.controller.server_list:
+                if server1.job_list!=[] and server1.is_health()!=False:
+                        server2 = self.controller.findback_server(server1)
+                        if server2!=False:
+                            data = [server1.mac,server1.ipv4,server2.mac,server2.ipv4]
+                            for j in server1.job_list:
+                                tmp = [j.mac, j.ipv4, j.port, j.pkt]
+                                data.append(tmp)
+                            out = json.dumps(data)
+                            s3.sendto(out, (socket.gethostname(),6003))
 
 
 
