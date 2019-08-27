@@ -43,15 +43,17 @@ class server_job_handler:
     
     def handle_ir(self, job_id , job_params):#handles an incoming IR request
         result = self.__ir_function(job_params)
+        
         job_stage=1 #IR received
         job_timeout=timestamp()+self.__timeout
         self.jobs[job_id]={ "job_id":job_id,"job_stage":job_stage,"curr_result":result,
-"job_timeout":job_timeout}
+"job_timeout":job_timeout, 0:result}
         return result
 
     def handle_cr(self, job_id , job_params): #handles an incoming CR request
         job=self.jobs[job_id]
-        result = self.__cr_function_list[job["job_stage"]-1](job_params)
+        result = self.__cr_function_list[job["job_stage"]-1](job["curr_result"])
+        job[job["job_stage"]]=result
         job["job_stage"]+=1
         job["curr_result"]=result
         job["job_timeout"]=timestamp()+self.__timeout
@@ -70,7 +72,12 @@ class function_package: #group of functions that the API needs: REST path, IR fu
         self.path = path
  
 
+
+
+
 class resource_init(resource.Resource):
+    job_result_dict={}
+
     def __init__(self, function_package):#initialise directory resource
         self.__function_package=function_package
         self.__server_job_handler=server_job_handler(function_package.ir_function, function_package.cr_function_list, function_package.timeout )
@@ -90,19 +97,24 @@ class resource_init(resource.Resource):
         server_job_id=(client_ip,job_id_client)
         with server_job_handler.lock:
             if count>self.__server_job_handler.num_stages:
-                return_payload= "Error, CR count exceeded".encode("ascii")           
+                return_payload= "Error, CR count exceeded".encode("ascii")
             elif count==0 and server_job_id not in self.__server_job_handler.jobs:
                return_payload= self.__server_job_handler.handle_ir(server_job_id,params)
             elif server_job_id not in self.__server_job_handler.jobs:
-               return_payload= "Error, no such job present on the server".encode("ascii")
+                return #do nothing to wait for server switch process
+               #return_payload= "Error, no such job present on the server".encode("ascii")
             elif count==self.__server_job_handler.jobs[server_job_id]["job_stage"]:
                return_payload= self.__server_job_handler.handle_cr((client_ip,job_id_client),params)
             elif count==self.__server_job_handler.jobs[server_job_id]["job_stage"]-1:
                self.__server_job_handler.increase_timeout(server_job_id)
                return_payload= self.__server_job_handler.jobs[server_job_id]["curr_result"]
+            elif count<self.__server_job_handler.jobs[server_job_id]["job_stage"]-1:
+               self.__server_job_handler.increase_timeout(server_job_id)
+               return_payload= self.__server_job_handler.jobs[server_job_id][count]
             else:
-               return_payload= "Error, invalid IR or CR.".encode("ascii")
+                return #do nothing to wait for server switch process to rebuild the job
                 
+            
 
         return aiocoap.Message(payload=request.payload[0:8]+return_payload)
 

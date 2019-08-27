@@ -30,8 +30,15 @@ class job:
             print(e)
             return -1
 
+
+
+        if unpack("i",response.payload[0:4])[0]!=self.count or response.payload[4:8]!=self.job_id:
+            val= await self.do_job_step(params)
+            return val
+
         self.count+=1
         self.params=response.payload[8:]
+
         return response.payload[8:]
 
 

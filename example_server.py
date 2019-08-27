@@ -14,7 +14,7 @@ def test_cr(params): #sample cr function. It will receive bytes and should also 
 
 def main(): #example application
 
-    cs= coap_server('0:0:0:0:0:ffff:c0a8:164',5000) #set address and port where this coap server runs
+    cs= coap_server('0:0:0:0:0:ffff:7f00:1',5000) #set address and port where this coap server runs
     fs = function_package(("jobs","testing"),test_ir,[test_cr,test_cr,test_cr], 5000)  #pass it the directory location, ir function, array of CR functions, and the timeout in milliseconds
     cs.add_listener(fs)
 

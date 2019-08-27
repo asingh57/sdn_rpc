@@ -7,7 +7,7 @@ from client_api import *
 
 async def main():
     protocol = await Context.create_client_context()#create context for client
-    serv_job=server_job_type(protocol,3,"coap://192.168.1.100:5000/jobs/testing") #pass this context, number of CRs at the server for this job type and the address of this job
+    serv_job=server_job_type(protocol,3,"coap://127.0.0.1:5000/jobs/testing") #pass this context, number of CRs at the server for this job type and the address of this job
 
     param="fff"
     print("client parameter is: "+param)
@@ -20,15 +20,15 @@ async def main():
     #METHOD 2: The client receives results one by one at each step, manipulates it and sends it for further processing
     res= await jb.do_job_step(param.encode("ascii"))
     print("Client gets result after one step:\n"+res.decode("ascii"))
-    res= await jb.do_job_step(res+"added_text".encode("ascii"))
-    print(res.decode("ascii"))
-    res= await jb.do_job_step(res[1:])
+    res= await jb.do_job_step(res)
     print(res.decode("ascii"))
     res= await jb.do_job_step(res)
-    print("Client asks for more CRs than available: "+res.decode("ascii"))
+    print(res.decode("ascii"))
+    res= await jb.do_job_step(res)
+    print("Client asks for more CRs than available: ")
 
     res= await jb.do_job_step(res)#exceeded CR requests, this should fail
-    print(res)
+    print(res.decode("ascii"))
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(main())
