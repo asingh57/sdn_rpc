@@ -1,3 +1,5 @@
+import sys
+sys.path.append(r'../server_api')
 from server_api import *
 
 

@@ -2,7 +2,10 @@
 import logging
 import asyncio
 
+import sys
+sys.path.append(r'../client_api')
 from client_api import *
+
 
 
 async def main():
