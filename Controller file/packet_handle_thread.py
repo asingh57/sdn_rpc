@@ -37,6 +37,7 @@ s3.bind(reply_address)
 class controller_server():
     def __init__(self):
         self.server_list =  []
+        self.buffer = []
 
     def check_server_exist(self, mac):
         if self.server_list==[]:
@@ -64,6 +65,7 @@ class packet_buffer():
         self.buffer = []
         self.lock_flag = 0
         self.lock_info = []
+        self.timestamp = int(time.time())
 
     def unlock(self, unlock_info):
         if self.lock_info==unlock_info:
@@ -77,6 +79,15 @@ class packet_buffer():
         self.lock_info = lock_info
         self.lock_flag = 1
 
+class packet_receiver(threading.Thread):
+    def __init__(self, controller):
+        threading.Thread.__init__(self)
+        self.controller = controller
+    def run(self):
+        while True:
+            data,addr = s.recvfrom(2048)
+            pkt = packet.Packet(data)
+            self.controller.buffer.append(pkt)
 
 class controller_thread(threading.Thread):
     def __init__(self, controller, packet_buffer):
@@ -86,27 +97,29 @@ class controller_thread(threading.Thread):
 
     def  run(self):
         while True:
-            data,addr = s.recvfrom(2048)
-            pkt = packet.Packet(data)
-            eth_header = pkt.get_protocol(ethernet.ethernet)
-            ipv4_header = pkt.get_protocol(ipv4.ipv4)
-            udp_header = pkt.get_protocol(udp.udp)
-            if udp_header.dst_port==SERVER_UDP_PORT:
-                server1 = self.controller.find_server(eth_header.dst)
-                if server1!=False and server1.is_health():
-                    print("job_added to ", server1.mac)
-                    server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
-                if server1==False:
-                    server1 =  controller_job_manager.controller_job_manager(ipv4_header.dst,eth_header.dst)
-                    server1.set_unhealth()
-                    server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
-                    self.controller.server_list.append(server1)
-            elif udp_header.src_port==SERVER_UDP_PORT:
-                unlock_info = [eth_header.src, ipv4_header.src, eth_header.dst, ipv4_header.dst, udp_header.dst_port]
-                if not self.packet_buffer.unlock(unlock_info):
+            if self.controller.buffer!=[]:
+                pkt = self.controller.buffer[0]
+                self.controller.buffer.pop(0)
+                eth_header = pkt.get_protocol(ethernet.ethernet)
+                ipv4_header = pkt.get_protocol(ipv4.ipv4)
+                udp_header = pkt.get_protocol(udp.udp)
+                if udp_header.dst_port==SERVER_UDP_PORT:
+                    server1 = self.controller.find_server(eth_header.dst)
+                    if server1!=False and server1.is_health():
+                        server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
+                    if server1==False:
+                        server1 =  controller_job_manager.controller_job_manager(ipv4_header.dst,eth_header.dst)
+                        server1.set_unhealth()
+                        server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
+                        self.controller.server_list.append(server1)
+                else:
+                    unlock_info = [eth_header.src, ipv4_header.src, eth_header.dst, ipv4_header.dst, udp_header.dst_port]
+                    if self.packet_buffer.lock_flag==1:
+                        print("lock is :",self.packet_buffer.unlock(unlock_info))
                     server1 = self.controller.find_server(eth_header.src)
                     if server1:
                         server1.add_reply(pkt[-1], eth_header.dst)
+
 
 
 
@@ -181,9 +194,11 @@ packet_buffer = packet_buffer()
 controller = controller_server()
 th1 = controller_thread(controller=controller, packet_buffer=packet_buffer)
 th2 = heartbeat_thread(controller=controller)
-th3 = checkserver_thread(controller=controller, packet_buffer=packet_buffer)
-th4 = callreply_thread(packet_buffer=packet_buffer)
+th3 = packet_receiver(controller=controller)
+th4 = checkserver_thread(controller=controller, packet_buffer=packet_buffer)
+th5 = callreply_thread(packet_buffer=packet_buffer)
 th1.start()
 th2.start()
 th3.start()
 th4.start()
+th5.start()
