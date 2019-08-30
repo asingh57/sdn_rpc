@@ -49,10 +49,12 @@ class myswitch(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
+        # get datapath information
         datapath = ev.msg.datapath
         self.datapath = datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+
         # set table-miss for table 0
         match = parser.OFPMatch()
         inst = [parser.OFPInstructionGotoTable(1)]
@@ -60,39 +62,44 @@ class myswitch(app_manager.RyuApp):
 
         # set table-miss for table 1
         match = parser.OFPMatch()
+        inst = [parser.OFPInstructionGotoTable(2)]
+        self.add_flow(datapath=datapath, table_id=1, priority=0, match=match, instructions =inst)
+
+        # set table-miss for table 2
+        match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath=datapath, table_id=1, priority=0, match=match, actions=actions)
+        self.add_flow(datapath=datapath, table_id=2, priority=0, match=match, actions=actions)
 
         # set coap packet_in
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
         ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
-        self.add_flow(datapath=datapath, table_id=0, priority=1, match=match, instructions =inst)
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(2)]
+        self.add_flow(datapath=datapath, table_id=1, priority=1, match=match, instructions =inst)
 
         # set coap packet_in
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
         ip_proto=inet.IPPROTO_UDP,udp_src=5000)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
-        self.add_flow(datapath=datapath, table_id=0, priority=1, match=match, instructions =inst)
+        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(2)]
+        self.add_flow(datapath=datapath, table_id=1, priority=1, match=match, instructions =inst)
 
         # set arp packet_in for controller
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ARP, arp_op = arp.ARP_REQUEST,
         arp_tpa = self.ipv4)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath=datapath, table_id=1, priority=2, match=match, actions=actions)
+        self.add_flow(datapath=datapath, table_id=2, priority=2, match=match, actions=actions)
 
         # set regular packet_in for controller
         match = parser.OFPMatch(eth_dst  = self.mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=self.ipv4)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath=datapath, table_id=1, priority=2, match=match,actions=actions)
+        self.add_flow(datapath=datapath, table_id=2, priority=2, match=match,actions=actions)
 
         # set icmp block in the begining
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,ip_proto=inet.IPPROTO_ICMP,
         icmpv4_type=icmp.ICMP_DEST_UNREACH, icmpv4_code=icmp.ICMP_PORT_UNREACH_CODE)
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath=datapath, table_id=1, priority=3, match=match, actions=actions)
+        self.add_flow(datapath=datapath, table_id=2, priority=3, match=match, actions=actions)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -167,21 +174,21 @@ class myswitch(app_manager.RyuApp):
             data.pop(0)
             if data!=[]:
                 for server_address in data:
-                    mac = server_address[0]
-                    ipv4 = server_address[1]
-                    self.redirection_mac.setdefault(mac,'')
-                    self.redirection_ipv4.setdefault(ipv4,'')
-                    if self.redirection_mac[mac]!='':
+                    old_mac = server_address[0]
+                    old_ipv4 = server_address[1]
+                    self.redirection_mac.setdefault(old_mac,'')
+                    self.redirection_ipv4.setdefault(old_ipv4,'')
+                    if self.redirection_mac[old_mac]!='':
                         # delete the health server flow
-                        match = parser.OFPMatch(eth_dst=mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=ipv4,
+                        match = parser.OFPMatch(eth_dst=old_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4,
                         ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
                         self.del_flow(datapath=datapath, table_id=0,  match=match)
                         # delete the health server flow
-                        actions = [parser.OFPActionSetField(eth_src=mac),parser.OFPActionSetField(ipv4_src=ipv4)]
+                        actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
                         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
                         self.del_flow(datapath=datapath, table_id=0, instructions=inst)
-                        self.redirection_mac[mac]=''
-                        self.redirection_ipv4[ipv4]=''
+                        self.redirection_mac[old_mac]=''
+                        self.redirection_ipv4[old_ipv4]=''
         else:
             # get the information from packet
             self.logger.info(data)
@@ -248,7 +255,7 @@ class myswitch(app_manager.RyuApp):
         cookie = cookie_mask = 0
         match = ofp_parser.OFPMatch()
         req = ofp_parser.OFPFlowStatsRequest(datapath, 0,
-                                         0,ofp.OFPP_ANY, ofp.OFPG_ANY,
+                                         2,ofp.OFPP_ANY, ofp.OFPG_ANY,
                                          cookie, cookie_mask,
                                          match)
         self.logger.info('send request')
@@ -319,7 +326,7 @@ class myswitch(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(out_port)]
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
-            self.add_flow(datapath=datapath, table_id=1, priority=1, match=match, actions=actions)
+            self.add_flow(datapath=datapath, table_id=2, priority=1, match=match, actions=actions)
             self.flow[src] = dst
 
         #send the packet out
