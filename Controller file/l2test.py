@@ -30,6 +30,8 @@ class myswitch(app_manager.RyuApp):
         self.count = 0
         self.ipv4 = '10.10.10.10'
         self.mac = '66:66:66:66:66:66'
+        self.redirection_mac = {}
+        self.redirection_ipv4 = {}
         # this is for test
         self.tmp = {}
 
@@ -145,7 +147,8 @@ class myswitch(app_manager.RyuApp):
             if dst!=self.flow[src]:
                 self.regular_packet_in(ev)
 
-        # check buffer
+        # check buffer every time
+        # set the socket config
         s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         local = socket.gethostname()
         call_port = 6003
@@ -154,13 +157,33 @@ class myswitch(app_manager.RyuApp):
         reply_address = (local,reply_port)
         s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         s.bind(call_address)
+        # receive data from the port
         data = 'get'
         s.sendto(data.encode(),reply_address)
         data,address = s.recvfrom(2048)
         data = pickle.loads(data)
-        if data==[]:
-            print('the buffer is empty')
+        if data[0]=='health server':
+            # delete redirection if the server is back to health
+            data.pop(0)
+            if data!=[]:
+                for server_address in data:
+                    mac = server_address[0]
+                    ipv4 = server_address[1]
+                    self.redirection_mac.setdefault(mac,'')
+                    self.redirection_ipv4.setdefault(ipv4,'')
+                    if self.redirection_mac[mac]!='':
+                        # delete the health server flow
+                        match = parser.OFPMatch(eth_dst=mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=ipv4,
+                        ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
+                        self.del_flow(datapath=datapath, table_id=0,  match=match)
+                        # delete the health server flow
+                        actions = [parser.OFPActionSetField(eth_src=mac),parser.OFPActionSetField(ipv4_src=ipv4)]
+                        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
+                        self.del_flow(datapath=datapath, table_id=0, instructions=inst)
+                        self.redirection_mac[mac]=''
+                        self.redirection_ipv4[ipv4]=''
         else:
+            # get the information from packet
             self.logger.info(data)
             old_mac = data[0]
             old_ipv4 = data[1]
@@ -171,31 +194,38 @@ class myswitch(app_manager.RyuApp):
             job_ipv4=job[1]
             job_port=job[2]
             pkt = job[3]
+            # check if the packet a ir packet: only add or delete flow when sending ir packet
             jobdata = Message.decode(pkt)
             int_unpack = unpack("ii",jobdata.payload[0:8])
             count = int_unpack[0]
             # add redirection flow
             if count==0:
+                # delete the oringal flow
                 match = parser.OFPMatch(eth_dst=old_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4,
                 ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
                 self.del_flow(datapath=datapath, table_id=0,  match=match)
-
+                # add new flow
                 actions = [parser.OFPActionSetField(eth_dst=backup_mac),parser.OFPActionSetField(ipv4_dst=backup_ipv4)]
                 inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
                 match = parser.OFPMatch(eth_dst=old_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4,
                 ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
                 self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
-
+                # delete the oringal flow
                 actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
                 inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
                 self.del_flow(datapath=datapath, table_id=0, instructions=inst)
-
+                # add new flow
                 actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
                 inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
                 match = parser.OFPMatch(eth_src=backup_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_src=backup_ipv4,
                 ip_proto=inet.IPPROTO_UDP,udp_src=5000)
                 self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
-
+                # record the flow change
+                self.redirection_mac.setdefault(old_mac,'')
+                self.redirection_ipv4.setdefault(old_ipv4,'')
+                self.redirection_mac[old_mac] = backup_mac
+                self.redirection_ipv4[old_ipv4] = backup_ipv4
+            # send the packet received
             pkt_out = packet.Packet(pkt)
             pkt_out.add_protocol(ethernet.ethernet(ethertype=ether_types.ETH_TYPE_IP, dst=backup_mac, src=job_mac))
             pkt_out.add_protocol(ipv4.ipv4(dst=backup_ipv4,src=job_ipv4,proto=inet.IPPROTO_UDP))
@@ -225,7 +255,7 @@ class myswitch(app_manager.RyuApp):
         datapath.send_msg(req)
 
 
-
+    # add flow method: add flow at specific table with priority
     def add_flow(self, datapath, table_id, priority, match, actions = [], instructions = []):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -239,6 +269,7 @@ class myswitch(app_manager.RyuApp):
         self.logger.info("flow added %d", self.count)
         datapath.send_msg(mod)
 
+    # delete flow method: use match or instructions to match the specific flow to delete
     def del_flow(self, datapath,table_id, match=[], instructions=[]):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -284,20 +315,14 @@ class myswitch(app_manager.RyuApp):
         else:
             out_port = ofproto.OFPP_FLOOD
 
-        # add regular packet
+        # add regular packet flow
         actions = [parser.OFPActionOutput(out_port)]
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port=in_port, eth_dst=dst)
-            # match2 = parser.OFPMatch(in_port=in_port,eth_src =src, eth_dst=dst, eth_type=ether_types.ETH_TYPE_IP,
-            # ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
-            # match3 = parser.OFPMatch(in_port=in_port,eth_src =src, eth_dst=dst, eth_type=ether_types.ETH_TYPE_IP,
-            # ip_proto=inet.IPPROTO_UDP,udp_src=5000)
             self.add_flow(datapath=datapath, table_id=1, priority=1, match=match, actions=actions)
-            # self.add_flow(datapath=datapath, table_id=1, priority=2, match=match2, actions=actions2)
-            # self.add_flow(datapath=datapath, table_id=1, priority=2, match=match3, actions=actions2)
             self.flow[src] = dst
 
-
+        #send the packet out
         out = parser.OFPPacketOut(datapath=datapath,
                                   buffer_id=ofproto.OFP_NO_BUFFER,
                                   in_port=in_port, actions=actions,
@@ -353,7 +378,7 @@ class myswitch(app_manager.RyuApp):
                 datapath.send_msg(out)
                 self.logger.info("Receive ICMP_ECHO_REQUEST,request IP is %s",ipv4_header.dst)
 
-        # regular packet handler
+        # regular udp packet handler
         udp_header = pkt.get_protocols(udp.udp)
         eth_header = pkt.get_protocol(ethernet.ethernet)
         if udp_header!=[] and eth_header.dst==self.mac :
