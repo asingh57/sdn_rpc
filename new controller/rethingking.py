@@ -110,10 +110,10 @@ class controller_thread(threading.Thread):
                         pkt_out = getrawpacket(eth_header.src, server2.mac,ipv4_header.src, server2.ipv4, udp_header.src_port,SERVER_UDP_PORT,pkt[-1])
                         tmp = [eth_header.dst,ipv4_header.dst, server2.mac, server2.ipv4, [eth_header.src,ipv4_header.src,udp_header.src_port,0,pkt_out]]
                         with packet_buffer_lock:
-                            # print("the packet_buffer_lock is locked by adding packet in to buffer2")
+                            print("the packet_buffer_lock is locked by adding packet in to buffer2")
                             self.packet_buffer.buffer.append(tmp)
                         with controller_lock:
-                            # print("the controller lock is locked by adding packet in to server")
+                            print("the controller lock is locked by adding packet in to server")
                             server2.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
                 if server1!=False and server1.is_health():
                     # the job_id is not unique by now
@@ -123,14 +123,14 @@ class controller_thread(threading.Thread):
                 unlock_info =  [ipv4_header.dst, udp_header.dst_port]
                 if self.packet_buffer.lock_flag==1:
                     with packet_buffer_lock:
-                        # print("the packet_buffer_lock is locked by adding reply")
+                        print("the packet_buffer_lock is locked by adding reply")
                         result = self.packet_buffer.unlock(unlock_info)
                     if result:
                         print("The reply is received and unlock the lock")
                     else:
                         print("The reply is not for lock")
                 with controller_lock:
-                    # print("the controller_lock is locked by adding reply")
+                    print("the controller_lock is locked by adding reply")
                     server1 = self.controller.find_server(eth_header.src)
                     if server1:
                         server1.add_reply(pkt[-1], ipv4_dst)
@@ -151,13 +151,13 @@ class heartbeat_thread(threading.Thread):
             if  self.controller.check_server_exist(ipv4_header.src)==False:
                 server1 =  controller_job_manager.controller_job_manager(ipv4_header.src,eth_header.src)
                 with controller_lock:
-                    # print("the controller_lock is locked by adding new server by heartbeat")
+                    print("the controller_lock is locked by adding new server by heartbeat")
                     self.controller.server_list.append(server1)
-                # print(server1.ipv4, "is added to the list" )
+                print(server1.ipv4, "is added to the list" )
             else:
                 server1 = self.controller.find_server(ipv4_header.src)
             with controller_lock:
-                # print("the controller_lock is locked by setting the stamp of server")
+                print("the controller_lock is locked by setting the stamp of server")
                 server1.set_stamp()
             for server1 in self.controller.server_list:
                 if server1.is_health()==False and server1.job_list==[]:
@@ -212,14 +212,6 @@ class callreply_thread(threading.Thread):
                     else:
                         data = pickle.dumps([])
                         s3.sendto(data,call_address)
-                    # Ask Abhi here tomorrow
-                    # else:
-                    #     info = ['health server']
-                    #     for server1 in self.controller.server_list:
-                    #         if server1.job_list==[] and server1.is_health()==True:
-                    #             info.append([server1.mac, server1.ipv4])
-                    #     data = pickle.dumps(info)
-                    #     s3.sendto(data,call_address)
                 else:
                     print('the message is wrong')
 

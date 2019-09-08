@@ -39,15 +39,15 @@ class myswitch(app_manager.RyuApp):
         self.flag  = 0
 
     # this is for test
-    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
-    def flow_stats_reply_handler(self, ev):
-        for stat in ev.msg.body:
-            key= str(stat.match)+str(stat.instructions)+str(stat.priority)+str(stat.table_id)
-            if key not in self.tmp:
-                self.tmp[key]=stat.packet_count
-            elif self.tmp[key]< stat.packet_count:
-                self.logger.info(stat)
-                self.tmp[key]=stat.packet_count
+    # @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
+    # def flow_stats_reply_handler(self, ev):
+    #     for stat in ev.msg.body:
+    #         key= str(stat.match)+str(stat.instructions)+str(stat.priority)+str(stat.table_id)
+    #         if key not in self.tmp:
+    #             self.tmp[key]=stat.packet_count
+    #         elif self.tmp[key]< stat.packet_count:
+    #             self.logger.info(stat)
+    #             self.tmp[key]=stat.packet_count
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -154,29 +154,35 @@ class myswitch(app_manager.RyuApp):
 
         if process==0:
             # regular packet_in flow adder
-            self.flow.setdefault(src,'')
-            if dst!=self.flow[src]:
-                self.regular_packet_in(ev)
+            # self.flow.setdefault(src,'')
+            self.regular_packet_in(ev)
 
 
         if self.flag==1:
-            # check buffer every time
-            # set the socket config
-            s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-            local = socket.gethostname()
-            call_port = 6003
-            call_address = (local,call_port)
-            reply_port = 6004
-            reply_address = (local,reply_port)
-            s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-            s.bind(call_address)
-            # receive data from the port
-            data = 'get'
-            s.sendto(data.encode(),reply_address)
-            self.logger.info('getsend')
-            data,address = s.recvfrom(2048)
-            data = pickle.loads(data)
-            self.logger.info('get packet')
+            try:
+                # check buffer every time
+                # set the socket config
+                s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+                local = socket.gethostname()
+                call_port = 6003
+                call_address = (local,call_port)
+                reply_port = 6004
+                reply_address = (local,reply_port)
+                s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+                s.bind(call_address)
+                # receive data from the port
+                data = 'get'
+                s.sendto(data.encode(),reply_address)
+                self.logger.info('getsend')
+                s.settimeout(2)
+                data,address = s.recvfrom(2048)
+                data = pickle.loads(data)
+                self.logger.info('get packet')
+            except:
+                self.logger.info('timeout')
+                data=[]
+
+
             if data!=[]:
                 self.logger.info(data)
                 old_mac = data[0]
@@ -239,16 +245,16 @@ class myswitch(app_manager.RyuApp):
                 self.flag = 0
 
         # this is for test to check which flow is used
-        ofp = datapath.ofproto
-        ofp_parser = datapath.ofproto_parser
-        cookie = cookie_mask = 0
-        match = ofp_parser.OFPMatch()
-        req = ofp_parser.OFPFlowStatsRequest(datapath, 0,
-                                         2,ofp.OFPP_ANY, ofp.OFPG_ANY,
-                                         cookie, cookie_mask,
-                                         match)
-        self.logger.info('send request')
-        datapath.send_msg(req)
+        # ofp = datapath.ofproto
+        # ofp_parser = datapath.ofproto_parser
+        # cookie = cookie_mask = 0
+        # match = ofp_parser.OFPMatch()
+        # req = ofp_parser.OFPFlowStatsRequest(datapath, 0,
+        #                                  2,ofp.OFPP_ANY, ofp.OFPG_ANY,
+        #                                  cookie, cookie_mask,
+        #                                  match)
+        # self.logger.info('send request')
+        # datapath.send_msg(req)
 
 
     # add flow method: add flow at specific table with priority
