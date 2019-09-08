@@ -139,19 +139,3 @@ class coap_server: #coap server setup by the client
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
