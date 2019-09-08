@@ -204,26 +204,35 @@ class myswitch(app_manager.RyuApp):
                     old_backmac = self.redirection_mac[job_mac]
                     old_backipv4 = self.redirection_ipv4[job_ipv4]
                     if old_backmac!='' and old_backipv4!='':
-                        # delete the oringal flow
-                        actions = [parser.OFPActionSetField(eth_dst=old_backmac),parser.OFPActionSetField(ipv4_dst=old_backipv4)]
+                        if old_backmac!='' and old_backipv4!='':
+                            # delete the oringal flow
+                            actions = [parser.OFPActionSetField(eth_dst=old_backmac),parser.OFPActionSetField(ipv4_dst=old_backipv4)]
+                            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
+                            match = parser.OFPMatch(eth_dst=old_mac, eth_src=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4, ipv4_src=job_ipv4,
+                            ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
+                            self.del_flow(datapath=datapath, table_id=0, instructions=inst,match=match)
+                            # delete the oringal flow
+                            actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
+                            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
+                            match = parser.OFPMatch(eth_src=old_backmac, eth_dst=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_src=old_backipv4, ipv4_dst=job_ipv4,
+                            ip_proto=inet.IPPROTO_UDP,udp_src=5000)
+                            self.del_flow(datapath=datapath, table_id=0, match=match,instructions=inst)
+                        # add new flow
+                        actions = [parser.OFPActionSetField(eth_dst=backup_mac),parser.OFPActionSetField(ipv4_dst=backup_ipv4)]
                         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
-                        self.del_flow(datapath=datapath, table_id=0, instructions=inst)
-                        # delete the oringal flow
-                        match = parser.OFPMatch(eth_src=old_backmac, eth_dst=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_src=old_backipv4, ipv4_dst=job_ipv4,
+                        match = parser.OFPMatch(eth_dst=old_mac, eth_src=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4, ipv4_src=job_ipv4,
+                        ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
+                        self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
+                        # add new flow
+                        actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
+                        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
+                        match = parser.OFPMatch(eth_src=backup_mac, eth_dst=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_src=backup_ipv4, ipv4_dst=job_ipv4,
                         ip_proto=inet.IPPROTO_UDP,udp_src=5000)
-                        self.del_flow(datapath=datapath, table_id=0, match=match)
-                    # add new flow
-                    actions = [parser.OFPActionSetField(eth_dst=backup_mac),parser.OFPActionSetField(ipv4_dst=backup_ipv4)]
-                    inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
-                    match = parser.OFPMatch(eth_dst=old_mac, eth_src=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_dst=old_ipv4, ipv4_src=job_ipv4,
-                    ip_proto=inet.IPPROTO_UDP,udp_dst=5000)
-                    self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
-                    # add new flow
-                    actions = [parser.OFPActionSetField(eth_src=old_mac),parser.OFPActionSetField(ipv4_src=old_ipv4)]
-                    inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions), parser.OFPInstructionGotoTable(1)]
-                    match = parser.OFPMatch(eth_src=backup_mac, eth_dst=job_mac, eth_type=ether_types.ETH_TYPE_IP, ipv4_src=backup_ipv4, ipv4_dst=job_ipv4,
-                    ip_proto=inet.IPPROTO_UDP,udp_src=5000)
-                    self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
+                        self.add_flow(datapath=datapath, table_id=0, priority=3, match=match, instructions =inst)
+                        # add table -miss
+                        match = parser.OFPMatch()
+                        inst = [parser.OFPInstructionGotoTable(1)]
+                        self.add_flow(datapath=datapath, table_id=0, priority=0, match=match, instructions =inst)
                     # record the flow change
                     self.redirection_mac[job_mac] = backup_mac
                     self.redirection_ipv4[job_ipv4] = backup_ipv4
