@@ -200,11 +200,11 @@ class callreply_thread(threading.Thread):
                         with packet_buffer_lock:
                             print("the packet_buffer_lock is locked by load buffer")
                             info = self.packet_buffer.buffer[0]
+                            self.packet_buffer.lockfun(lock_info)
+                            self.packet_buffer.temp_packet = data
                         data = pickle.dumps(info)
                         s3.sendto(data,call_address)
                         lock_info = [info[4][1], info[4][2]]
-                        self.packet_buffer.lockfun(lock_info)
-                        self.packet_buffer.temp_packet = data
                         print('packet send and wait for the reply to unlock')
                     elif self.packet_buffer.lock_flag==1:
                         data = self.packet_buffer.temp_packet
