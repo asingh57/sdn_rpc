@@ -2,7 +2,7 @@ import sys
 import asyncio
 sys.path.append(r'../server_api')
 from server_api import *
-
+ 
 
 
 def test_ir(params): #sample ir function. It will receive bytes and should also send bytes
