@@ -81,6 +81,19 @@ class packet_buffer():
             self.lock_flag = 1
             return False
 
+    def clean(self):
+        self.buffer.pop(0)
+        self.lock_flag = 0
+        self.lock_info = []
+        self.temp_packet = []
+
+    def cleanall(self):
+        self.buffer = []
+        self.lock_flag = 0
+        self.lock_info = []
+        self.temp_packet = []
+
+
     def lockfun(self, lock_info):
         self.lock_info = lock_info
         self.lock_flag = 1
@@ -98,42 +111,53 @@ class controller_thread(threading.Thread):
             eth_header = pkt.get_protocol(ethernet.ethernet)
             ipv4_header = pkt.get_protocol(ipv4.ipv4)
             udp_header = pkt.get_protocol(udp.udp)
-            jobdata = Message.decode(pkt[-1])
-            int_unpack = unpack("ii",jobdata.payload[0:8])
-            count = int_unpack[0]
-            job_id = int_unpack[1]
-            if udp_header.dst_port==SERVER_UDP_PORT:
-                server1 = self.controller.find_server(ipv4_header.dst)
-                if server1==False and count==0:
-                    server2 = self.controller.findback_server()
-                    if server2!=False:
-                        pkt_out = getrawpacket(eth_header.src, server2.mac,ipv4_header.src, server2.ipv4, udp_header.src_port,SERVER_UDP_PORT,pkt[-1])
-                        tmp = [eth_header.dst,ipv4_header.dst, server2.mac, server2.ipv4, [eth_header.src,ipv4_header.src,udp_header.src_port,0,pkt_out]]
-                        with packet_buffer_lock:
-                            print("the packet_buffer_lock is locked by adding packet in to buffer2")
-                            self.packet_buffer.buffer.append(tmp)
+            try:
+                jobdata = Message.decode(pkt[-1])
+                int_unpack = unpack("ii",jobdata.payload[0:8])
+                count = int_unpack[0]
+                job_id = int_unpack[1]
+                if udp_header.dst_port==SERVER_UDP_PORT:
+                    server1 = self.controller.find_server(ipv4_header.dst)
+                    if server1==False and count==0:
+                        server2 = self.controller.findback_server()
+                        if server2!=False:
+                            # pkt_out = getrawpacket(eth_header.src, server2.mac,ipv4_header.src, server2.ipv4, udp_header.src_port,SERVER_UDP_PORT,pkt[-1])
+                            # tmp = [eth_header.dst,ipv4_header.dst, server2.mac, server2.ipv4, [eth_header.src,ipv4_header.src,udp_header.src_port,0,pkt_out]]
+                            # this is for test
+                            tmp = [eth_header.dst,ipv4_header.dst, server2.mac, server2.ipv4, [eth_header.src,ipv4_header.src,udp_header.src_port,0,pkt[-1]]]
+                            with packet_buffer_lock:
+                                print("the packet_buffer_lock is locked by adding packet in to buffer2")
+                                self.packet_buffer.cleanall()
+                                self.packet_buffer.buffer.append(tmp)
+                            with controller_lock:
+                                print("the controller lock is locked by adding packet in to server")
+                                server2.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
+                    if server1!=False and server1.is_health():
+                        # the job_id is not unique by now
                         with controller_lock:
-                            print("the controller lock is locked by adding packet in to server")
-                            server2.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
-                if server1!=False and server1.is_health():
-                    # the job_id is not unique by now
+                            server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
+                        if count ==0:
+                            with packet_buffer_lock:
+                                tmp = [eth_header.dst,ipv4_header.dst, eth_header.dst,ipv4_header.dst, [eth_header.src,ipv4_header.src,udp_header.src_port,0,pkt[-1]]]
+                                self.packet_buffer.cleanall()
+                                self.packet_buffer.buffer.append(tmp)
+                else:
+                    unlock_info =  [ipv4_header.dst, udp_header.dst_port]
+                    if self.packet_buffer.lock_flag==1:
+                        with packet_buffer_lock:
+                            print("the packet_buffer_lock is locked by adding reply")
+                            result = self.packet_buffer.unlock(unlock_info)
+                        if result:
+                            print("The reply is received and unlock the lock")
+                        else:
+                            print("The reply is not for lock")
                     with controller_lock:
-                        server1.add_job(pkt[-1], eth_header.src, ipv4_header.src,udp_header.src_port)
-            else:
-                unlock_info =  [ipv4_header.dst, udp_header.dst_port]
-                if self.packet_buffer.lock_flag==1:
-                    with packet_buffer_lock:
-                        print("the packet_buffer_lock is locked by adding reply")
-                        result = self.packet_buffer.unlock(unlock_info)
-                    if result:
-                        print("The reply is received and unlock the lock")
-                    else:
-                        print("The reply is not for lock")
-                with controller_lock:
-                    print("the controller_lock is locked by adding reply")
-                    server1 = self.controller.find_server(eth_header.src)
-                    if server1:
-                        server1.add_reply(pkt[-1], ipv4_dst)
+                        print("the controller_lock is locked by adding reply")
+                        server1 = self.controller.find_server(eth_header.src)
+                        if server1:
+                            server1.add_reply(pkt[-1], ipv4_dst)
+            except:
+                print("get wrong packet")
 
 class heartbeat_thread(threading.Thread):
     def __init__(self,controller,packet_buffer):
@@ -153,7 +177,7 @@ class heartbeat_thread(threading.Thread):
                 with controller_lock:
                     print("the controller_lock is locked by adding new server by heartbeat")
                     self.controller.server_list.append(server1)
-                print(server1.ipv4, "is added to the list" )
+                print(server1.ipv4, server1.mac,"is added to the list" )
             else:
                 server1 = self.controller.find_server(ipv4_header.src)
             with controller_lock:
@@ -173,9 +197,11 @@ class heartbeat_thread(threading.Thread):
                                 count = 0
                                 print("job count ", j.count,"job pkt", len(j.pkt))
                                 for pkt in list(j.pkt.values()):
-                                    print(pkt)
-                                    pkt = getrawpacket(j.mac, server2.mac, j.ipv4, server2.ipv4, j.port, SERVER_UDP_PORT,pkt)
-                                    tmp = [server1.mac, server1.ipv4, server2.mac, server2.ipv4, [j.mac, j.ipv4, j.port,count, pkt]]
+                                    # pkt = getrawpacket(j.mac, server2.mac, j.ipv4, server2.ipv4, j.port, SERVER_UDP_PORT,pkt)
+                                    # tmp = [server1.mac, server1.ipv4, server2.mac, server2.ipv4, [j.mac, j.ipv4, j.port,count, pkt]]
+                                    #this is for test
+                                    tmp =[server1.mac, server1.ipv4, server2.mac, server2.ipv4, [j.mac, j.ipv4, j.port,count, pkt]]
+                                    print(tmp)
                                     with packet_buffer_lock:
                                         print("the packet_buffer_lock is locked by adding packet in to buffer1")
                                         self.packet_buffer.buffer.append(tmp)
@@ -190,6 +216,7 @@ class callreply_thread(threading.Thread):
     def __init__(self,  packet_buffer):
         threading.Thread.__init__(self)
         self.packet_buffer = packet_buffer
+        self.count = 0
 
     def run(self):
         while True:
@@ -206,9 +233,13 @@ class callreply_thread(threading.Thread):
                             self.packet_buffer.temp_packet = data
                         s3.sendto(data,call_address)
                         print('packet send and wait for the reply to unlock')
-                    elif self.packet_buffer.lock_flag==1:
+                    elif self.packet_buffer.lock_flag==1 and self.count<=3:
                         data = self.packet_buffer.temp_packet
                         s3.sendto(data,call_address)
+                        self.count +=1
+                    elif self.packet_buffer.lock_flag==1 and self.count>3:
+                        self.packet_buffer.clean()
+                        self.count = 0
                     else:
                         data = pickle.dumps([])
                         s3.sendto(data,call_address)

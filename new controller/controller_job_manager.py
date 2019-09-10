@@ -66,7 +66,7 @@ class controller_job_manager():
 
     def check_job(self):
             for j in self.job_list:
-                if int(time.time())-j.stamp>=5 and j.count==len(j.pkt) and j.count!=0:
+                if int(time.time())-j.stamp>=2 and j.count==len(j.pkt) and j.count!=0:
                     self.job_list.remove(j)
 
 
