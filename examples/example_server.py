@@ -3,11 +3,11 @@ import asyncio
 import time
 sys.path.append(r'../server_api')
 from server_api import *
- 
+
 
 
 def test_ir(params): #sample ir function. It will receive bytes and should also send bytes
-    
+
     print(time.time())
     params=params.decode('ascii')
     params+="a"
@@ -29,7 +29,6 @@ def main(): #example application
 
     cs.run_server()#this will run forever
 
-    
+
 if __name__ == "__main__":
     main()
-

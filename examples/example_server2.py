@@ -7,7 +7,7 @@ from server_api import *
 
 ct=0
 
-pid= "26253"
+pid= "22017"
 
 def test_ir(params): #sample ir function. It will receive bytes and should also send bytes
     params=params.decode('ascii')
@@ -23,8 +23,8 @@ def test_cr(params): #sample cr function. It will receive bytes and should also 
         print(time.time())
         while True:
             1==1
-    
-    ct+=1    
+
+    ct+=1
     #await asyncio.sleep(3)
     return (params).encode('ascii')
 
@@ -36,7 +36,6 @@ def main(): #example application
 
     cs.run_server()#this will run forever
 
-    
+
 if __name__ == "__main__":
     main()
-

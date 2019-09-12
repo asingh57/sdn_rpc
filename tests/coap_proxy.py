@@ -68,7 +68,13 @@ class active_job_threading(threading.Thread):
 
             print(sender_ip,sender_port,receiver_ip, receiver_port)
             spoof_packet= IP(src='10.0.0.2',  dst=receiver_ip) / UDP(sport=6003, dport=receiver_port) / rawdata
-            send(spoof_packet)
+            s = socket.socket(family=socket.AF_INET,type=socket.SOCK_DGRAM)
+            s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            address = ('10.0.0.2',6003)
+            s.bind(address)
+            s.sendto(rawdata,(receiver_ip,receiver_port))
+            s.close()
+            # send(spoof_packet)
             print("sending request to"+receiver_ip)
 
 
@@ -82,8 +88,12 @@ class active_job_threading(threading.Thread):
             job_id = int_unpack[1]
             jobs[job_id]["job_timeout"]=current_milli_time()+JOBEXPIRYTIME
             spoof_packet= IP(src='10.0.0.2', dst=jobs[job_id]["client_address"]) / UDP(sport=5001,dport=jobs[job_id]["client_port"]) / rawdata
-            rawdata = raw(spoof_packet)
-            send(spoof_packet)
+            s = socket.socket(family=socket.AF_INET,type=socket.SOCK_DGRAM)
+            s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            address = ('10.0.0.2',5001)
+            s.bind(address)
+            s.sendto(rawdata,(jobs[job_id]["client_address"],jobs[job_id]["client_port"]))
+            s.close()
             print("sending reply to"+jobs[job_id]["client_address"])
 
 

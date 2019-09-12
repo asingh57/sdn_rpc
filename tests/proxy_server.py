@@ -27,7 +27,7 @@ class serverheartbeat():
         self.server_list.setdefault(ipv4,'')
 
         self.server_list[ipv4] = int(time.time())
-            
+
 
     def check_health(self,ipv4):
         if ipv4 in self.server_list:
@@ -79,9 +79,8 @@ class requesthandle(threading.Thread):
                 if self.serverheartbeat.check_health(server):
                     receiver_ip = server
                     receiver_port =5000
-                    
-            
-            print(receiver_ip,receiver_port)    
+
+            print(receiver_ip,receiver_port)
             coap.parse_client_request_packet(sender_ip=sender_ip,sender_port=sender_port,rawdata=data,
                                                                                     receiver_ip=receiver_ip, receiver_port=receiver_port)
 

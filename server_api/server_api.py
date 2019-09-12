@@ -11,18 +11,18 @@ from struct import *
 def timestamp():
     return int(round(time.time() * 1000))
 
-class server_job_handler:    
+class server_job_handler:
     job_type_list=[]
     started=False
     lock = threading.Lock()
-    
+
 
     @staticmethod
     async def job_deletion_manager():#deletes stale jobs
         while True:
             for handler in server_job_handler.job_type_list:
                 job_list = handler.jobs
-                with server_job_handler.lock:                    
+                with server_job_handler.lock:
                     curr_time=timestamp()
                     for job_id in list(job_list):
                         if curr_time>job_list[job_id]["job_timeout"]:
@@ -40,10 +40,10 @@ class server_job_handler:
         self.jobs= {}
         server_job_handler.job_type_list.append(self)
 
-    
+
     def handle_ir(self, job_id , job_params):#handles an incoming IR request
         result = self.__ir_function(job_params)
-        
+
         job_stage=1 #IR received
         job_timeout=timestamp()+self.__timeout
         self.jobs[job_id]={ "job_id":job_id,"job_stage":job_stage,"curr_result":result,
@@ -70,7 +70,7 @@ class function_package: #group of functions that the API needs: REST path, IR fu
         self.cr_function_list = cr_function_list
         self.timeout = timeout
         self.path = path
- 
+
 
 
 
@@ -92,7 +92,7 @@ class resource_init(resource.Resource):
 
         params=request.payload[8:]
         client_ip="aaaaa"#TODO: find out how client IP can be obtained
-        
+
         return_payload=""
         server_job_id=(client_ip,job_id_client)
         with server_job_handler.lock:
@@ -113,8 +113,8 @@ class resource_init(resource.Resource):
                return_payload= self.__server_job_handler.jobs[server_job_id][count]
             else:
                 return #do nothing to wait for server switch process to rebuild the job
-                
-            
+
+
 
         return aiocoap.Message(payload=request.payload[0:8]+return_payload)
 
@@ -133,9 +133,5 @@ class coap_server: #coap server setup by the client
         resource_new=resource_init(function_package)
         self.root.add_resource(function_package.path, resource_new)
 
-    def run_server(self): #start the infinite loop        
+    def run_server(self): #start the infinite loop
         asyncio.get_event_loop().run_forever()
-        
-
-
-

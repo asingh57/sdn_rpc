@@ -12,7 +12,7 @@ async def main():
     #protocol = await Context.create_client_context()#create context for client
     root = resource.Site()
     protocol = await Context.create_server_context(root,bind=("0:0:0:0:0:ffff:a00:3",3333))
-    serv_job=server_job_type(protocol,3,"coap://10.0.0.2:5000/jobs/testing") #pass this context, number of CRs at the server for this job type and the address of this job
+    serv_job=server_job_type(protocol,3,"coap://10.0.0.2:5001/jobs/testing") #pass this context, number of CRs at the server for this job type and the address of this job
 
     param="fff"
     print("client parameter is: "+param)
