@@ -70,7 +70,7 @@ class active_job_threading(threading.Thread):
             spoof_packet= IP(src='10.0.0.2',  dst=receiver_ip) / UDP(sport=6003, dport=receiver_port) / rawdata
             s = socket.socket(family=socket.AF_INET,type=socket.SOCK_DGRAM)
             s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-            address = ('10.0.0.2',6003)
+            address = ('10.0.0.3',6003)
             s.bind(address)
             s.sendto(rawdata,(receiver_ip,receiver_port))
             s.close()
@@ -90,7 +90,7 @@ class active_job_threading(threading.Thread):
             spoof_packet= IP(src='10.0.0.2', dst=jobs[job_id]["client_address"]) / UDP(sport=5001,dport=jobs[job_id]["client_port"]) / rawdata
             s = socket.socket(family=socket.AF_INET,type=socket.SOCK_DGRAM)
             s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
-            address = ('10.0.0.2',5001)
+            address = ('10.0.0.3',5001)
             s.bind(address)
             s.sendto(rawdata,(jobs[job_id]["client_address"],jobs[job_id]["client_port"]))
             s.close()
