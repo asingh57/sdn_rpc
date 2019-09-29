@@ -16,9 +16,12 @@ static void message_handler(struct coap_context_t *ctx, coap_session_t *session,
         printf("No data\n");
         printf("%d\n",received->code);
     }
+    else{
+        printf("Data Received: %s\n Receive code: %d\n",received->data,received->code);
+    }
 }
 
-void coap_init(struct Address_info **client_details, int client_count,struct Address_info dest_info){
+void coap_client_init(struct Address_info **client_details, int client_count,struct Server_address_info dest_info){
     //Initialises all clients and sets server destination
 
     coap_startup(); //Start coap and create context
@@ -81,19 +84,12 @@ void coap_init(struct Address_info **client_details, int client_count,struct Add
           coap_log( LOG_EMERG, "cannot create PDU\n" );
         }
 
-        
-        
+        coap_uri_t *uri;
 
 
-
-        coap_uri_t uri;
-        char server_uri[20] = "/jobs/testing";
+        coap_add_option(pdu, COAP_OPTION_URI_PATH, strlen(dest_info.uri), dest_info.uri);
 
         
-        if (coap_split_uri((const uint8_t *)server_uri, strlen(server_uri), &uri) == -1) {
-            error("CoAP server uri error");
-            break;
-        }
 
         printf("URI CREATED\n");
         /* and send the PDU */
@@ -109,42 +105,4 @@ void coap_init(struct Address_info **client_details, int client_count,struct Add
     
 }
 
-int
-resolve_address(const char *host, const char *service, coap_address_t *dst) {
 
-  struct addrinfo *res, *ainfo;
-  struct addrinfo hints;
-  int error, len=-1;
-
-  memset(&hints, 0, sizeof(hints));
-  memset(dst, 0, sizeof(*dst));
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_family = AF_UNSPEC;
-
-  error = getaddrinfo(host, service, &hints, &res);
-
-  printf("%s\n",host);
-  if (error != 0) {
-    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(error));
-    return error;
-  }
-  else{
-    printf("getaddrinfo success\n");
-    }
-
-  for (ainfo = res; ainfo != NULL; ainfo = ainfo->ai_next) {
-    switch (ainfo->ai_family) {
-    case AF_INET6:
-    case AF_INET:
-      len = dst->size = ainfo->ai_addrlen;
-      memcpy(&dst->addr.sin6, ainfo->ai_addr, dst->size);
-      goto finish;
-    default:
-      ;
-    }
-  }
-
- finish:
-  freeaddrinfo(res);
-  return len;
-}
