@@ -86,15 +86,31 @@ class resource_init(resource.Resource):
 
 
     async def render_get(self, request): #render a reply packet
+
+        return_addr = (request.remote.sockaddr[0].split(':')[-1]+'\0'+str(request.remote.sockaddr[1])+'\0').encode("ascii");
+
+        spl=request.payload.decode("ascii").split('\0',2)
+
+        #print(spl)
+        request.payload= spl[2].encode("ascii")
+
+
+
         int_unpack=unpack("ii",request.payload[0:8])
         count=int_unpack[0]
         job_id_client=int_unpack[1]
 
+        
+        
+
         params=request.payload[8:]
-        client_ip="aaaaa"#TODO: find out how client IP can be obtained
+        client_ip=request.remote.sockaddr[0].split(':')[-1]
 
         return_payload=""
         server_job_id=(client_ip,job_id_client)
+
+        
+
         with server_job_handler.lock:
             if count>self.__server_job_handler.num_stages:
                 return_payload= "Error, CR count exceeded".encode("ascii")
@@ -114,9 +130,9 @@ class resource_init(resource.Resource):
             else:
                 return #do nothing to wait for server switch process to rebuild the job
 
-
-
-        return aiocoap.Message(payload=request.payload[0:8]+return_payload)
+        #print("Returning the following",return_addr+request.payload[0:8]+return_payload)
+        
+        return aiocoap.Message(payload=return_addr+request.payload[0:8]+return_payload)
 
 
 class coap_server: #coap server setup by the client
