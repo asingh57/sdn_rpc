@@ -2,6 +2,7 @@ Install the following
 
 
 libboost-all-dev
+asciidoc
 https://github.com/obgm/libcoap
 https://github.com/DaveGamble/cJSON
 

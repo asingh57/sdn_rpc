@@ -1,5 +1,5 @@
 #include <coap2/coap.h>
-
+#include "../common/common.h"
 
 struct Address_info{
     char *interface_addr;
@@ -7,12 +7,7 @@ struct Address_info{
 };
 
 
-void coap_init(struct Address_info **client_details, int client_count, struct Address_info dest_info);
-
-int resolve_address(const char *host, const char *service, coap_address_t *dst);//resolves a address given as char array and parses it for aiocoap
-
-
-
+void coap_client_init(struct Address_info **client_details, int client_count, struct Server_address_info dest_info);
 
 struct Sessions{
     coap_context_t  *ctx;
