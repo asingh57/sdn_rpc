@@ -1,6 +1,6 @@
 CC=gcc
 LIBDIR= ../../
-INCLUDES= -g
+INCLUDES= -g -pthread 
 LIBLOCATION=/usr/local/lib/
 LIBCOAP=$(LIBLOCATION)libcoap-2-openssl.so
 LIBJSON=$(LIBLOCATION)libcjson.so

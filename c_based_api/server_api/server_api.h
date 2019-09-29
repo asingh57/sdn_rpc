@@ -4,7 +4,7 @@
 
 
 typedef struct Servers{
-    struct coap_context_t  *ctx;//one context
+    struct coap_context_t  **ctxs;//one context
     struct coap_endpoint_t **eps;
     struct coap_resource_t **res;
     struct coap_pdu_t *pdu;
