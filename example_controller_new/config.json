@@ -1,0 +1,40 @@
+{
+    "ryu_config" : {
+        "_commit":"this is the topology of this switch",
+        "network_config" : {
+            "ryu_listen_port":7000,
+            "ipv4_port" : {"10.0.0.1":1,
+                                        "10.0.0.2":2,
+                                        "10.0.0.3":3},
+            "ipv4_mac" : {"10.0.0.1":"B8:27:EB:C7:FB:EE",
+                                        "10.0.0.2":"00:E0:4C:6A:41:DF",
+                                        "10.0.0.3":"00:E0:4C:69:CA:6D"}
+        }
+    },
+    "controller_config":{
+        "struct of controller config":{
+            "_commit1":"The key word can't be changed",
+            "_commit2":"Add the contoller in the controller_config_list",
+            "job_type":"Type the name of job_type",
+            "server_controller_ipv4":"The ip address of controller",
+            "server_udp_port":"The port this kind of server used",
+            "coap_data_ipv4":"The ip address you want to use to get the coap data from ryu",
+            "coap_data_port":"The port you want to use to get the coap data from ryu",
+            "heartbeat_ipv4":"The ip address you want to use to get heartbeat",
+            "heartbeat_port":"The port you want to use to get the heartbeat",
+            "call_port":"The port calls ryu"
+        },
+        "controller_config_list":[
+            {
+                "job_type":"add character",
+                "server_controller_ipv4":"10.10.10.10",
+                "server_udp_port":5001,
+                "coap_data_ipv4":"10.0.0.3",
+                "coap_data_port":6001,
+                "heartbeat_ipv4":"10.0.0.3",
+                "heartbeat_port":6002,
+                "call_port":6003
+            }
+        ]
+    }
+}
