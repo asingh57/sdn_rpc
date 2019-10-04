@@ -5,9 +5,9 @@ import os
 sys.path.append(r'../server_api')
 from server_api import *
 
-ct=0
-
-pid= "22017"
+# ct=0
+#
+# pid= "22017"
 
 def test_ir(params): #sample ir function. It will receive bytes and should also send bytes
     params=params.decode('ascii')
@@ -17,14 +17,14 @@ def test_ir(params): #sample ir function. It will receive bytes and should also 
 def test_cr(params): #sample cr function. It will receive bytes and should also send bytes
     params=params.decode('ascii')
     params+="b"
-    global ct
-    if ct==2:
-        os.system("kill -9 "+pid)
-        print(time.time())
-        while True:
-            1==1
-
-    ct+=1
+    # global ct
+    # if ct==2:
+    #     os.system("kill -9 "+pid)
+    #     print(time.time())
+    #     while True:
+    #         1==1
+    #
+    # ct+=1
     #await asyncio.sleep(3)
     return (params).encode('ascii')
 

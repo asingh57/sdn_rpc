@@ -4,7 +4,6 @@ sys.path.append(r'../controller_api')
 from controller_server_api import *
 from coap_handler_thread_api import *
 from heartbeat_thread_api import *
-from callreply_thread_api import *
 
 
 class controller():

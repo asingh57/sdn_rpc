@@ -28,7 +28,7 @@
             {
                 "job_type":"add character",
                 "server_controller_ipv4":"10.10.10.10",
-                "server_udp_port":5001,
+                "server_udp_port":5000,
                 "coap_data_ipv4":"10.0.0.3",
                 "coap_data_port":6001,
                 "heartbeat_ipv4":"10.0.0.3",
